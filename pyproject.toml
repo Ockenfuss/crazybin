@@ -19,8 +19,11 @@ classifiers = [
 ]
 keywords = ["hexbin", "histogram", "tiling", "parquet", "escher"]
 dependencies = [
+    "numpy",
+    "matplotlib",
+    "shapely",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 
 # [project.optional-dependencies]
 # extra = []
