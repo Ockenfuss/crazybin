@@ -1,0 +1,32 @@
+[build-system]
+requires      = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "crazybin"
+version = "1.0.0"
+description = "Much better than hexbins plots! Use any kind of tile to visualize data and pictures!"
+readme = "README.md"
+authors = [{ name = "Paul Ockenfuß", email = "paul.ockenfuss@physik.uni-muenchen.de" }]
+license = { file = "LICENSE" }
+classifiers = [
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Education",
+    "Topic :: Multimedia :: Graphics",
+    "Framework :: Matplotlib",
+]
+keywords = ["hexbin", "histogram", "tiling", "parquet", "escher"]
+dependencies = [
+]
+requires-python = ">=3.8"
+
+# [project.optional-dependencies]
+# extra = []
+
+[project.urls]
+Homepage = "https://github.com/Ockenfuss/crazybin"
+
+# [project.scripts]
+# inlog-flowchart = "inlog.flowchart:main"
