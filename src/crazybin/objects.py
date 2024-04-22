@@ -1,4 +1,3 @@
-#%%
 import numpy as np
 from shapely.geometry import Polygon, Point
 from shapely.ops import unary_union
@@ -6,8 +5,17 @@ from shapely import affinity
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import json
-#%%
+from importlib import resources
 
+def get_tile(tile):
+    if isinstance(tile, str):
+        traversable=resources.files("crazybin")
+        with resources.as_file(traversable) as f:
+            tilepath=f/"tiles" / f"{tile}.json"
+            if not tilepath.exists():
+                raise ValueError(f"Tile {tile} not found")
+            tile=Tile.from_json(tilepath)
+    return tile
 
 
 class View(object):
@@ -206,7 +214,6 @@ class LookupTable(object):
     def __init__(self, tile: Tile):
         box=tile.get_bounding_box()
         gridview=GridView.from_circle(tile.grid, radius=box.diagonal)
-        # points_i, points_j=tile.grid.get_gridpoints_in_circle(radius=box.diagonal)
         points_x, points_y=gridview.get_xy()
         distance=np.sqrt(points_x**2+points_y**2)
         ind_sorted=np.argsort(distance)
@@ -266,7 +273,7 @@ class ColorParquet(object):
         return map_value_to_color
 
         
-    def plot(self, ax, cmap='viridis', vmin=None, vmax=None, edgecolor=None):
+    def plot(self, ax, cmap='viridis', vmin=None, vmax=None, edgecolor=None, full=False):
         if self.ncolors==1:
             if vmin is None:
                 vmin=min(self.colors.values())
@@ -286,14 +293,13 @@ class ColorParquet(object):
                 for k, atom in enumerate(self.parquet[i,j].atoms):
                     x, y = atom.exterior.xy
                     ax.plot(x, y, color=edgecolor)
-        
-        ax.set_xlim(self.parquet.view.xmin, self.parquet.view.xmax)
-        ax.set_ylim(self.parquet.view.ymin, self.parquet.view.ymax)
+        if not full:
+            ax.set_xlim(self.parquet.view.xmin, self.parquet.view.xmax)
+            ax.set_ylim(self.parquet.view.ymin, self.parquet.view.ymax)
 
 class Histogram(object):
     def __init__(self, x,y,weights=None, areadensity=False, tile='hex_rhombs', gridsize=10):
-        if isinstance(tile, str):
-            tile=Tile.from_json(f'Tiles/{tile}.json')
+        tile=get_tile(tile)
         view=View(min(x), max(x), min(y), max(y))
         self.parquet=Parquet(tile, view, gridsize=gridsize)
         self.lut=LookupTable(self.parquet.root_tile)
@@ -333,11 +339,14 @@ class Histogram(object):
 
 
 class TileImage(object):
-    def __init__(self, image,tile, gridsize=10):
-        if isinstance(tile, str):
-            tile=Tile.from_json(f'Tiles/{tile}.json')
-        view=View(0, image.shape[1], 0, image.shape[0])
-        self.parquet=Parquet(tile, view, gridsize)
+    def __init__(self, image,tile, gridsize=10, extent=None):
+        tile=get_tile(tile)
+        self.image_view=View(0, image.shape[1], 0, image.shape[0])
+        if extent is None:
+            self.view=self.image_view
+        else:
+            self.view=View(*extent)
+        self.parquet=Parquet(tile, self.view, gridsize)
         self.natoms=self.parquet.root_tile.natoms
         keys=[(i,j,k) for i,j in self.parquet.tiles for k in range(self.natoms)]
         if image.ndim==2:
@@ -349,84 +358,15 @@ class TileImage(object):
 
         for i,j in self.parquet.tiles:
             for k, atom in enumerate(self.parquet[i,j].atoms):
-                ix,iy=round(atom.centroid.x), round(atom.centroid.y)
-                ix=max(0, min(image.shape[1]-1, ix))
-                iy=max(0, min(image.shape[0]-1, iy))
+                ix,iy=self._xy_to_image(*atom.centroid.coords[0])
                 self.colors[i,j,k]=image[iy,ix]
+    
+    def _xy_to_image(self, x,y):
+        ix,iy=round((x-self.view.xmin)/(self.view.width)*self.image_view.width), round((y-self.view.ymin)/(self.view.height)*self.image_view.height)
+        ix=max(0, min(self.image_view.width-1, ix))
+        iy=max(0, min(self.image_view.height-1, iy))
+        return ix,iy
         
     def plot(self, ax=None,cmap='viridis', vmin=None, vmax=None, edgecolor=None):
         self.color_parquet=ColorParquet(self.parquet, self.colors)
         self.color_parquet.plot(ax, cmap=cmap, vmin=vmin, vmax=vmax, edgecolor=edgecolor)
-
-
-
-    
-
-#%%
-view=[0,10,0,10]
-nsamples=50000
-x=np.random.normal(5, 3, nsamples)
-y=np.random.normal(5, 3, nsamples)
-
-#sine wave distribution
-x=np.linspace(0,10,100)
-y=np.linspace(0,10,100)
-x,y=np.meshgrid(x,y)
-x=x.ravel()
-y=y.ravel()
-weights=np.sin(x)*np.cos(y)
-
-
-
-def hexagon_tile():
-    g1=[1.5,-0.5]
-    g2=[1.5,0.5]
-    return [Polygon([[0,0], [1,0], [1.5,0.5], [1,1], [0,1], [-0.5,0.5]])], g1, g2
-
-def main(x,y,weights,ax, gridsize=10, view=None, cmap='viridis', vmin=None, vmax=None, tile='hexagon', edgecolor=None):
-    if tile=='hexagon':
-        tile, g1, g2=hexagon_tile()
-    elif isinstance(tile, str):
-        tile=Tile.from_json(f'Tiles/{tile}.json')
-    if view is None:
-        view=[min(x), max(x), min(y), max(y)]
-    view=View(*view)
-    in_view=view.check_point_in_view(x, y)
-    x=x[in_view]
-    y=y[in_view]
-    parquet=Parquet(tile, view, gridsize=gridsize)
-    hist=Histogram(parquet)
-    hist.count(x,y,weights, areadensity=True)
-    hist.plot(ax, cmap, vmin, vmax, edgecolor=edgecolor)
-    return ax
-
-
-fig,ax=plt.subplots(figsize=(10,10))
-# main(x,y,weights,ax, gridsize=10,view=view, tile='lizard', edgecolor=None)
-# main(x,y,weights,ax, gridsize=4,view=view, tile='lizard', edgecolor='black', cmap='jet')
-# main(x,y,weights,ax, gridsize=8,view=view, tile='frog', edgecolor='black', cmap='coolwarm')
-main(x,y,weights,ax, gridsize=6,view=view, tile='hex_rhombs', edgecolor='black', cmap='jet')
-# %%
-import skimage as ski
-impath='Images/Marilyn.jpeg'
-# impath='Images/GreatWave.jpg'
-image=ski.io.imread(impath)
-image=image[::-1,:,:]
-# image=ski.color.rgb2gray(image)
-image=ski.transform.resize(image, (200,200))
-fig, ax=plt.subplots()
-ax.imshow(image, origin='lower')
-#%%
-x=np.linspace(0,10,image.shape[1])
-y=np.linspace(0,10,image.shape[0])
-x,y=np.meshgrid(x,y)
-x=x.flatten()
-y=y.flatten()
-weights=image.flatten()
-fig,ax=plt.subplots(figsize=(10,10))
-main(x,y,weights,ax, gridsize=10,view=view, tile='hex_rhombs', edgecolor='black', cmap='coolwarm')
-# %%
-tile_image=TileImage(image, tile='hex_rhombs', gridsize=10)
-fig, ax=plt.subplots(figsize=(10,10))
-tile_image.plot(ax)
-# %%
