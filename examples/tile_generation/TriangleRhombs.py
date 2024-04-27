@@ -51,7 +51,7 @@ ax.fill(*affinity.translate(union, *v1).exterior.xy, alpha=0.5)
 ax.fill(*affinity.translate(union, *v2).exterior.xy, alpha=0.5)
 #%%
 tile={'v1':v1, 'v2':v2, 'atoms':[list(p.exterior.coords) for p in primitive]}
-with open('/project/meteo/work/Paul.Ockenfuss/PhD/Miscellaneous/EscherPlots/Tiles/hex_rhombs.json', 'w') as f:
+with open('/project/meteo/work/Paul.Ockenfuss/PhD/Miscellaneous/EscherPlots/Tiles/hex_rhomb.json', 'w') as f:
     json.dump(tile, f, indent=4)
 
 # %%

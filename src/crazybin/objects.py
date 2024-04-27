@@ -282,6 +282,9 @@ class ColorParquet(object):
             colormap = self._create_colormap(cmap, vmin, vmax)
         else:
             colormap=lambda x: x
+        
+        if ax is None:
+            fig, ax=plt.subplots()
 
         for i,j in self.parquet.tiles:
             for k, atom in enumerate(self.parquet[i,j].atoms):
@@ -296,6 +299,7 @@ class ColorParquet(object):
         if not full:
             ax.set_xlim(self.parquet.view.xmin, self.parquet.view.xmax)
             ax.set_ylim(self.parquet.view.ymin, self.parquet.view.ymax)
+        return ax
 
 class Histogram(object):
     def __init__(self, x,y,weights=None, areadensity=False, tile='hex_rhombs', gridsize=10):
@@ -335,7 +339,7 @@ class Histogram(object):
 
     def plot(self, ax=None, cmap='viridis', vmin=None, vmax=None, edgecolor=None):
         self.color_parquet=ColorParquet(self.parquet, self.hist)
-        self.color_parquet.plot(ax, cmap=cmap, vmin=vmin, vmax=vmax, edgecolor=edgecolor)
+        return self.color_parquet.plot(ax, cmap=cmap, vmin=vmin, vmax=vmax, edgecolor=edgecolor)
 
 
 class TileImage(object):
@@ -367,6 +371,14 @@ class TileImage(object):
         iy=max(0, min(self.image_view.height-1, iy))
         return ix,iy
         
-    def plot(self, ax=None,cmap='viridis', vmin=None, vmax=None, edgecolor=None):
+    def plot(self, ax=None,cmap='viridis', vmin=None, vmax=None, edgecolor=None, aspect='equal', origin='upper'):
         self.color_parquet=ColorParquet(self.parquet, self.colors)
-        self.color_parquet.plot(ax, cmap=cmap, vmin=vmin, vmax=vmax, edgecolor=edgecolor)
+        ax=self.color_parquet.plot(ax, cmap=cmap, vmin=vmin, vmax=vmax, edgecolor=edgecolor)
+        if origin=='upper':
+            ax.invert_yaxis()
+        elif origin=='lower':
+            pass
+        else:
+            raise ValueError('origin must be upper or lower')
+        ax.set_aspect(aspect)
+        return ax
