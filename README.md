@@ -6,8 +6,8 @@ Want an example? What about this double sine distribution visualized in the form
 
 ```python
 import numpy as np
+import matplotlib.pyplot as plt
 from crazybin import crazybin
-
 
 x=np.linspace(0,10,100)
 y=np.linspace(0,10,100)
@@ -16,5 +16,9 @@ x=x.ravel()
 y=y.ravel()
 weights=np.sin(x)*np.cos(y)
 
-crazybin(x,y,weights, tile='reptile')
+crazybin(x,y,weights, tile='reptile', cmap='jet', gridsize=4, edgecolor='black')
+plt.show()
 ```
+
+![](examples/images/reptiles_sinewave.jpg)
+
