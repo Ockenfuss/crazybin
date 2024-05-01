@@ -6,17 +6,38 @@ import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import json
 from importlib import resources
+import cmath
+from functools import partial
 
-def get_tile(tile):
-    if isinstance(tile, str):
+
+GOLDEN = (1 + np.sqrt(5)) / 2
+
+def get_from_json(json_name : str, reader: object):
+    if isinstance(json_name, str):
         traversable=resources.files("crazybin")
         with resources.as_file(traversable) as f:
-            tilepath=f/"tiles" / f"{tile}.json"
-            if not tilepath.exists():
-                raise ValueError(f"Tile {tile} not found")
-            tile=Tile.from_json(tilepath)
-    return tile
+            filepath=f/"tiles" / f"{json_name}.json"
+            if not filepath.exists():
+                raise ValueError(f"JSON File for {json_name} not found")
+            reader_object=reader.from_json(filepath)
+        return reader_object
+    else:
+        raise ValueError('json_name must be a string')
 
+def get_tile(tile_name):
+    return get_from_json(tile_name, Tile)
+def get_grid(grid_name):
+    return get_from_json(grid_name, Grid)
+
+def get_parquet(tile_name, allow_penrose=True):
+    if tile_name[:3]=='pen' and not allow_penrose:
+        raise NotImplementedError("Penrose parquets are not yet implemented for this function.")
+    if tile_name=='pen_rhomb':
+        return PenroseP3Parquet
+    else:
+        grid=get_grid(tile_name)
+        tile=get_tile(tile_name)
+        return partial(RegularParquet, tile, grid)
 
 class View(object):
     def __init__(self, xmin, xmax, ymin, ymax):
@@ -39,6 +60,16 @@ class View(object):
     def check_point_in_view(self, x,y):
         return (x>=self.xmin) & (x<=self.xmax) & (y>=self.ymin) & (y<=self.ymax)
     
+    def get_corners(self):
+        return ((self.xmin, self.ymin), (self.xmax, self.ymin), (self.xmax, self.ymax), (self.xmin, self.ymax))
+    
+    def check_corner_in(self, other):
+        for x,y in self.get_corners():
+            if other.check_point_in_view(x,y):
+                return True
+        return False
+
+    
 
     def pad(self, tile):
         box=tile.get_bounding_box()
@@ -58,6 +89,13 @@ class Grid(object):
         self.g2=g2
         self.total_dx=abs(g1[0])+abs(g2[0]) #sum of x components
         self.total_dy=abs(g1[1])+abs(g2[1])
+
+    @classmethod
+    def from_json(cls, path):
+        with open(path, 'r') as f:
+            json_dict=json.load(f)
+            grid=Grid(json_dict['v1'], json_dict['v2'])
+        return grid
     
     def scale(self, sx, sy):
         g1_scaled=[sx*self.g1[0], sy*self.g1[1]]
@@ -152,10 +190,9 @@ class GridView(object):
         ax.scatter(points_x, points_y, **kwargs)
 
 class Tile(object):
-    def __init__(self, atoms, grid: Grid):
+    def __init__(self, atoms):
         self.atoms=atoms
         self.natoms=len(atoms)
-        self.grid=grid
         self.union=unary_union(atoms)
         self.centroid=self.union.centroid
     
@@ -164,8 +201,7 @@ class Tile(object):
         with open(path, 'r') as f:
             tile=json.load(f)
             atoms=[Polygon(t) for t in tile['atoms']]
-            grid=Grid(tile['v1'], tile['v2'])
-        tile=cls(atoms, grid)
+        tile=cls(atoms)
         tile=tile.center()
         return tile
     
@@ -175,16 +211,15 @@ class Tile(object):
     
     def center(self):
         atoms_shifted=[affinity.translate(atom, -self.centroid.x, -self.centroid.y) for atom in self.atoms]
-        return Tile(atoms_shifted, self.grid)
+        return Tile(atoms_shifted)
     
     def scale(self, sx=1.0, sy=1.0):
         atoms_scaled=[affinity.scale(atom, sx, sy, origin=self.centroid) for atom in self.atoms]
-        grid_scaled=self.grid.scale(sx, sy)
-        return Tile(atoms_scaled, grid_scaled)
+        return Tile(atoms_scaled)
     
     def translate(self, dx=0.0, dy=0.0):
         atoms_translated=[affinity.translate(atom, dx, dy) for atom in self.atoms]
-        return Tile(atoms_translated, self.grid)
+        return Tile(atoms_translated)
     
     def contains(self, point: Point)->int:
         for i, atom in enumerate(self.atoms):
@@ -197,9 +232,7 @@ class Tile(object):
     
     def __repr__(self):
         box=self.get_bounding_box()
-        g1=[round(g, 2) for g in self.grid.g1]
-        g2=[round(g, 2) for g in self.grid.g2]
-        description=f'Tile with {len(self.atoms)} atoms\nBounding box: {box}\nGrid: {g1}, {g2}'
+        description=f'Tile with {len(self.atoms)} atoms\nBounding box: {box}'
         return description
     
     def plot(self, ax=None, **kwargs):
@@ -219,31 +252,7 @@ class LookupTable(object):
         ind_sorted=np.argsort(distance)
         self.sorted_neighbours=np.array([gridview.points_i[ind_sorted], gridview.points_j[ind_sorted]]).T
 
-
 class Parquet(object):
-    def __init__(self, tile: Tile, view:View, gridsize=10):
-        if np.iterable(gridsize):
-            nx, ny=gridsize
-        elif np.isscalar(gridsize):
-            nx=gridsize
-            ny=None
-        else:
-            raise ValueError('gridsize must be a scalar or a tuple')
-
-        sx=view.width/(nx*tile.grid.total_dx)
-        if ny is None:
-            sy=sx
-        else:
-            sy=view.height/(ny*tile.grid.total_dy)
-        self.root_tile=tile.scale(sx, sy)
-        self.view=view
-
-        view_padded=view.pad(self.root_tile)
-        gridview=GridView.from_view(self.root_tile.grid, view_padded)
-        self.tiles={}
-        for i,j in zip(gridview.points_i, gridview.points_j):
-            self.tiles[i, j]=self.root_tile.translate(*self.root_tile.grid.g_to_xy(i,j))
-    
     def __getitem__(self, key):
         return self.tiles[key]
 
@@ -255,6 +264,107 @@ class Parquet(object):
         if plot_view:
             self.view.plot(ax=ax, color='black')
 
+
+class RegularParquet(Parquet):
+    def __init__(self, tile: Tile, grid:Grid, view:View, gridsize=10):
+        if np.iterable(gridsize):
+            nx, ny=gridsize
+        elif np.isscalar(gridsize):
+            nx=gridsize
+            ny=None
+        else:
+            raise ValueError('gridsize must be a scalar or a tuple')
+
+        sx=view.width/(nx*grid.total_dx)
+        if ny is None:
+            sy=sx
+        else:
+            sy=view.height/(ny*grid.total_dy)
+        self.root_tile=tile.scale(sx, sy)
+        self.grid=grid.scale(sx, sy)
+        self.view=view
+
+        view_padded=view.pad(self.root_tile)
+        gridview=GridView.from_view(self.grid, view_padded)
+        self.tiles={}
+        for i,j in zip(gridview.points_i, gridview.points_j):
+            self.tiles[i, j]=self.root_tile.translate(*self.grid.g_to_xy(i,j))
+
+class PenroseP3Parquet(Parquet):
+    def __init__(self, view: View, generations=1):
+        if generations>12:
+            raise ValueError("More than 12 inflation generations are not recommended.")
+        self.view=view
+        self.generations=generations
+
+        initial_radius=self.view.diagonal/2*1.3
+        center=self.view.center[0]+self.view.center[1]*1j
+        triangles=PenroseP3Parquet._create_initial_wheel(center,initial_radius)
+        for i in range(generations):
+            triangles=PenroseP3Parquet._subdivide(triangles)
+        pairs=PenroseP3Parquet._find_rhombus_pairs(triangles)
+        polygons=PenroseP3Parquet._to_polygon_rhombs(triangles, pairs)
+        tiles=[Tile([p]) for p in polygons]
+
+        tiles=[t for t in tiles if t.get_bounding_box().check_corner_in(self.view)]
+        keys=range(len(tiles))
+        self.tiles=dict(zip(keys, tiles))
+
+    @staticmethod
+    def _create_initial_wheel(center, radius):
+        # Create wheel of type 0 ('red') triangles around the origin
+        triangles = []
+        for i in range(10):
+            B = cmath.rect(radius, (2*i - 1) * np.pi / 10)+center
+            C = cmath.rect(radius, (2*i + 1) * np.pi / 10)+center
+            if i % 2 == 0:
+                B, C = C, B  # Make sure to mirror every second triangle
+            triangles.append((0, center, B, C))
+        return triangles
+    
+    @staticmethod
+    def _subdivide(triangles):
+        result = []
+        for color, A, B, C in triangles:
+            if color == 0:
+                # Subdivide red triangle
+                P = A + (B - A) / GOLDEN
+                result += [(0, C, P, B), (1, P, C, A)]
+            else:
+                # Subdivide blue triangle
+                Q = B + (A - B) / GOLDEN
+                R = B + (C - B) / GOLDEN
+                result += [(1, R, C, A), (1, Q, R, B), (0, R, Q, A)]
+        return result
+    
+    @staticmethod
+    def _find_rhombus_pairs(triangles):
+        """find triangles which share the points B,C: Each pair will form a rhombus"""
+        triangles_bc=[(np.round(tri[2],10), np.round(tri[3],10)) for tri in triangles]
+        visited=[False]*len(triangles_bc)
+        pairs=[]
+        for i in range(len(triangles_bc)):
+            if visited[i]:
+                continue
+            for j in range(i+1, len(triangles_bc)):
+                if visited[j]:
+                    continue
+                if triangles_bc[i][0]==triangles_bc[j][0] and triangles_bc[i][1]==triangles_bc[j][1]:
+                    visited[j]=True
+                    pairs.append((i,j))
+                    break
+        return pairs
+
+    @staticmethod
+    def _to_polygon_rhombs(triangles, pairs):
+        polygons = []
+        for pair in pairs:
+            A=triangles[pair[0]]
+            B=triangles[pair[1]]
+            polygons.append(Polygon([Point(A[1].real, A[1].imag), Point(A[2].real, A[2].imag), Point(B[1].real, B[1].imag), Point(A[3].real, A[3].imag)]))
+        return polygons
+#%%
+    
 class ColorParquet(object):
     def __init__(self, parquet: Parquet, colors: dict):
         self.parquet=parquet
@@ -286,14 +396,14 @@ class ColorParquet(object):
         if ax is None:
             fig, ax=plt.subplots()
 
-        for i,j in self.parquet.tiles:
-            for k, atom in enumerate(self.parquet[i,j].atoms):
+        for key in self.parquet.tiles:
+            for k, atom in enumerate(self.parquet[key].atoms):
                 x, y = atom.exterior.xy
-                ax.fill(x, y, color=colormap(self.colors[i,j,k]))
+                ax.fill(x, y, color=colormap(self.colors[key,k]))
                 
         if edgecolor is not None:
-            for i,j in self.parquet.tiles:
-                for k, atom in enumerate(self.parquet[i,j].atoms):
+            for key in self.parquet.tiles:
+                for k, atom in enumerate(self.parquet[key].atoms):
                     x, y = atom.exterior.xy
                     ax.plot(x, y, color=edgecolor)
         if not full:
@@ -303,19 +413,18 @@ class ColorParquet(object):
 
 class Histogram(object):
     def __init__(self, x,y,weights=None, areadensity=False, tile='hex_rhombs', gridsize=10):
-        tile=get_tile(tile)
+        parquet_generator=get_parquet(tile, allow_penrose=False)
         view=View(min(x), max(x), min(y), max(y))
-        self.parquet=Parquet(tile, view, gridsize=gridsize)
+        self.parquet=parquet_generator(view, gridsize=gridsize)
         self.lut=LookupTable(self.parquet.root_tile)
-        self.natoms=self.parquet.root_tile.natoms
 
-        keys=[(i,j,k) for i,j in self.parquet.tiles for k in range(self.natoms)]
+        keys=[(key,k) for key,tile in self.parquet.tiles.items() for k in range(tile.natoms)]
         self.hist=dict.fromkeys(keys, 0)
 
         self._count(x,y,weights, areadensity)
     
     def _get_containing_index(self, x,y):
-        offset_i, offset_j=self.parquet.root_tile.grid.xy_to_g_int(x,y)
+        offset_i, offset_j=self.parquet.grid.xy_to_g_int(x,y)
         for i,j in self.lut.sorted_neighbours:
                 try:
                     k=self.parquet.tiles[i+offset_i,j+offset_j].contains(Point(x,y))
@@ -344,15 +453,14 @@ class Histogram(object):
 
 class TileImage(object):
     def __init__(self, image,tile, gridsize=10, extent=None):
-        tile=get_tile(tile)
+        parquet_generator=get_parquet(tile)
         self.image_view=View(0, image.shape[1], 0, image.shape[0])
         if extent is None:
             self.view=self.image_view
         else:
             self.view=View(*extent)
-        self.parquet=Parquet(tile, self.view, gridsize)
-        self.natoms=self.parquet.root_tile.natoms
-        keys=[(i,j,k) for i,j in self.parquet.tiles for k in range(self.natoms)]
+        self.parquet=parquet_generator(self.view, gridsize)
+        keys=[(key,k) for key,tile in self.parquet.tiles.items() for k in range(tile.natoms)]
         if image.ndim==2:
             self.colors=dict.fromkeys(keys, 0)
         elif image.ndim==3:
@@ -360,10 +468,10 @@ class TileImage(object):
         else:
             raise ValueError('Image must have 2 or 3 dimensions')
 
-        for i,j in self.parquet.tiles:
-            for k, atom in enumerate(self.parquet[i,j].atoms):
+        for key in self.parquet.tiles:
+            for k, atom in enumerate(self.parquet[key].atoms):
                 ix,iy=self._xy_to_image(*atom.centroid.coords[0])
-                self.colors[i,j,k]=image[iy,ix]
+                self.colors[key,k]=image[iy,ix]
     
     def _xy_to_image(self, x,y):
         ix,iy=round((x-self.view.xmin)/(self.view.width)*self.image_view.width), round((y-self.view.ymin)/(self.view.height)*self.image_view.height)
