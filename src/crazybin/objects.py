@@ -7,37 +7,10 @@ import matplotlib.pyplot as plt
 import json
 from importlib import resources
 import cmath
-from functools import partial
+from pathlib import Path
 
 
 GOLDEN = (1 + np.sqrt(5)) / 2
-
-def get_from_json(json_name : str, reader: object):
-    if isinstance(json_name, str):
-        traversable=resources.files("crazybin")
-        with resources.as_file(traversable) as f:
-            filepath=f/"tiles" / f"{json_name}.json"
-            if not filepath.exists():
-                raise ValueError(f"JSON File for {json_name} not found")
-            reader_object=reader.from_json(filepath)
-        return reader_object
-    else:
-        raise ValueError('json_name must be a string')
-
-def get_tile(tile_name):
-    return get_from_json(tile_name, Tile)
-def get_grid(grid_name):
-    return get_from_json(grid_name, Grid)
-
-def get_parquet(tile_name, allow_penrose=True):
-    if tile_name[:3]=='pen' and not allow_penrose:
-        raise NotImplementedError("Penrose parquets are not yet implemented for this function.")
-    if tile_name=='pen_rhomb':
-        return PenroseP3Parquet
-    else:
-        grid=get_grid(tile_name)
-        tile=get_tile(tile_name)
-        return partial(RegularParquet, tile, grid)
 
 class View(object):
     def __init__(self, xmin, xmax, ymin, ymax):
@@ -244,9 +217,9 @@ class Tile(object):
             # ax.plot(x, y, **kwargs)
 
 class LookupTable(object):
-    def __init__(self, tile: Tile):
+    def __init__(self, tile: Tile, grid:Grid):
         box=tile.get_bounding_box()
-        gridview=GridView.from_circle(tile.grid, radius=box.diagonal)
+        gridview=GridView.from_circle(grid, radius=box.diagonal)
         points_x, points_y=gridview.get_xy()
         distance=np.sqrt(points_x**2+points_y**2)
         ind_sorted=np.argsort(distance)
@@ -363,7 +336,64 @@ class PenroseP3Parquet(Parquet):
             B=triangles[pair[1]]
             polygons.append(Polygon([Point(A[1].real, A[1].imag), Point(A[2].real, A[2].imag), Point(B[1].real, B[1].imag), Point(A[3].real, A[3].imag)]))
         return polygons
-#%%
+
+
+class ParquetFactory(object):
+    @staticmethod
+    def _get_from_json(json_name : str, reader: object):
+        path=Path(json_name)
+        if path.suffix=='.json':
+            if not path.exists():
+                raise FileNotFoundError(f"File {path.name} not found")
+            return reader.from_json(path)
+        elif isinstance(json_name, str):
+            traversable=resources.files("crazybin")
+            with resources.as_file(traversable) as f:
+                filepath=f/"tiles" / f"{json_name}.json"
+                if not filepath.exists():
+                    raise FileNotFoundError(f"JSON resource for {json_name} not found")
+                reader_object=reader.from_json(filepath)
+            return reader_object
+        else:
+            raise ValueError('json_name must be a string')
+
+    @staticmethod
+    def _get_tile(tile_name):
+        return ParquetFactory._get_from_json(tile_name, Tile)
+    
+    @staticmethod
+    def _get_grid(grid_name):
+        return ParquetFactory._get_from_json(grid_name, Grid)
+
+    @classmethod
+    def from_keyword(cls, tile_name, allow_penrose=True):
+        if tile_name[:3]=='pen' and not allow_penrose:
+            raise NotImplementedError("Penrose parquets are not yet implemented for this function.")
+        if tile_name=='pen_rhomb':
+            return PenroseP3ParquetFactory()
+        else:
+            grid=ParquetFactory._get_grid(tile_name)
+            tile=ParquetFactory._get_tile(tile_name)
+            return RegularParquetFactory(tile, grid)
+        
+    def __call__(self, view, resolution):
+        return self.get_parquet(view, resolution)
+
+
+class RegularParquetFactory(ParquetFactory):
+    def __init__(self, tile, grid) -> None:
+        self.tile=tile
+        self.grid=grid
+    
+    def get_parquet(self, view, gridsize):
+        return RegularParquet(self.tile, self.grid, view, gridsize)
+
+class PenroseP3ParquetFactory(ParquetFactory):
+    def __init__(self):
+        pass
+
+    def get_parquet(self, view, generations):
+        return PenroseP3Parquet(view, generations)
     
 class ColorParquet(object):
     def __init__(self, parquet: Parquet, colors: dict):
@@ -412,11 +442,10 @@ class ColorParquet(object):
         return ax
 
 class Histogram(object):
-    def __init__(self, x,y,weights=None, areadensity=False, tile='hex_rhombs', gridsize=10):
-        parquet_generator=get_parquet(tile, allow_penrose=False)
+    def __init__(self, x,y,parquet_factory:ParquetFactory,weights=None, areadensity=False, gridsize=10):
         view=View(min(x), max(x), min(y), max(y))
-        self.parquet=parquet_generator(view, gridsize=gridsize)
-        self.lut=LookupTable(self.parquet.root_tile)
+        self.parquet=parquet_factory(view, gridsize)
+        self.lut=LookupTable(self.parquet.root_tile, self.parquet.grid)
 
         keys=[(key,k) for key,tile in self.parquet.tiles.items() for k in range(tile.natoms)]
         self.hist=dict.fromkeys(keys, 0)
@@ -441,10 +470,10 @@ class Histogram(object):
             weights=np.ones(len(x))
         for xx,yy, ww in zip(x,y, weights):
             i,j,k=self._get_containing_index(xx,yy)
-            self.hist[i,j,k]+=ww
+            self.hist[(i,j),k]+=ww
         if areadensity:
-            for (i,j,k) in self.hist:
-                    self.hist[i,j,k]/=self.parquet[i,j][k].area
+            for key,atom_key in self.hist:
+                    self.hist[key,atom_key]/=self.parquet[key][atom_key].area
 
     def plot(self, ax=None, cmap='viridis', vmin=None, vmax=None, edgecolor=None):
         self.color_parquet=ColorParquet(self.parquet, self.hist)
@@ -452,14 +481,13 @@ class Histogram(object):
 
 
 class TileImage(object):
-    def __init__(self, image,tile, gridsize=10, extent=None):
-        parquet_generator=get_parquet(tile)
+    def __init__(self, image,parquet_factory:ParquetFactory, gridsize=10, extent=None):
         self.image_view=View(0, image.shape[1], 0, image.shape[0])
         if extent is None:
             self.view=self.image_view
         else:
             self.view=View(*extent)
-        self.parquet=parquet_generator(self.view, gridsize)
+        self.parquet=parquet_factory(self.view, gridsize)
         keys=[(key,k) for key,tile in self.parquet.tiles.items() for k in range(tile.natoms)]
         if image.ndim==2:
             self.colors=dict.fromkeys(keys, 0)
