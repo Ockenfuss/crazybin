@@ -59,6 +59,7 @@ Possible keywords for the `tile` argument are:
 Regular tiles can be read from files with `json` format. `v1` and `v2` contain the lattice vectors, defining the translation directions of the tiles. Each tile consists of one or more 'atoms', which are arbitrary shapes which make up the tile.
 <details>
   <summary>Example JSON for a hexagon</summary>
+
 ```json
 {
     "v1": [
