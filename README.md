@@ -36,6 +36,12 @@ plt.show()
 
 ![](examples/images/grande_jatte_seurat.jpg)
 
+## Installation
+The package can be installed using `pip`:
+```bash
+pip install crazybin
+```
+
 ## Usage
 `crazybin` and `imshow` are (more or less) drop-in replacements of `matplotlib.hexbin` and `matplotlib.imshow`. For detailed information, check out their doc-strings. See also the examples in the [examples folder](./examples/).
 ```python
