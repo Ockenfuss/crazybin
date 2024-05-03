@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from crazybin import imshow
 
-imagepath='images/grande_jatte_seurat.jpg'
+imagepath='images/originals/Grande_Jatte.jpeg'
 image=plt.imread(imagepath)/255
 #%%
 fig, ax=plt.subplots(figsize=(7,7))

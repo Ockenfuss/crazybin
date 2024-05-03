@@ -37,7 +37,7 @@ plt.show()
 ![](examples/images/grande_jatte_seurat.jpg)
 
 ## Usage
-`crazybin` and `imshow` are (more or less) drop-in replacements of `matplotlib.hexbin` and `matplotlib.imshow`. For detailed information, check out their doc-strings.
+`crazybin` and `imshow` are (more or less) drop-in replacements of `matplotlib.hexbin` and `matplotlib.imshow`. For detailed information, check out their doc-strings. See also the examples in the [examples folder](./examples/).
 ```python
 from crazybin import crazybin, imshow
 ```
@@ -111,6 +111,7 @@ Grids consist of `Tile` objects, which can be instantiated from a list of `shape
 ```python
 import numpy as np
 from shapely import Polygon
+import matplotlib.pyplot as plt
 from crazybin import Tile, Grid, TileImage, RegularParquetFactory
 grid=Grid([0,1],[1,0])
 tile=Tile([Polygon([(0,0), (1,0), (1,1), (0,1)])])
@@ -118,6 +119,7 @@ fac=RegularParquetFactory(tile, grid)
 image=np.random.rand(10,10)
 im=TileImage(image, fac, gridsize=10)
 im.plot()
+plt.show()
 ```
 
 ## Credits
