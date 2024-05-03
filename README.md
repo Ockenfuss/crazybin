@@ -125,3 +125,4 @@ plt.show()
 ## Credits
 The implementation of the penrose tiling generator was inspired by [this blog article](https://preshing.com/20110831/penrose-tiling-explained/). The "reptile" and "frog" patterns were inspired by [this](https://www.geogebra.org/m/CUdKaHeC#material/vnb3vpsy) and [this](https://www.geogebra.org/m/CUdKaHeC#material/pzjk5fru) [Geogebra tesselation projects](https://www.geogebra.org/m/CUdKaHeC). Artist images were taken from Wikipedia.
 
+<img src="https://github.com/Ockenfuss/crazybin/blob/main/examples/images/frogs_gaussian.jpg" width="30%"></img> <img src="https://github.com/Ockenfuss/crazybin/blob/main/examples/images/hex_rhomb.jpg" width="30%"></img> <img src="https://github.com/Ockenfuss/crazybin/blob/main/examples/images/great_wave.jpg" width="30%"></img>
