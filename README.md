@@ -56,7 +56,9 @@ Possible keywords for the `tile` argument are:
 
 ### Custom Tiles
 #### Via JSON File
-Regular tiles can be read from files with `json` format. `v1` and `v2` contain the lattice vectors, defining the translation directions of the tiles. Each tile consists of one or more 'atoms', which are arbitrary shapes which make up the tile. The following example describes a hexagon:
+Regular tiles can be read from files with `json` format. `v1` and `v2` contain the lattice vectors, defining the translation directions of the tiles. Each tile consists of one or more 'atoms', which are arbitrary shapes which make up the tile.
+<details>
+  <summary>Example JSON for a hexagon</summary>
 ```json
 {
     "v1": [
@@ -101,6 +103,9 @@ Regular tiles can be read from files with `json` format. `v1` and `v2` contain t
     ]
 }
 ```
+</details>
+
+
 JSON files can be specified by providing a filename with `.json` extension to the tile keyword arguments.
 ```python
 imshow(image, tile='path/to/hex.json', gridsize=150)
