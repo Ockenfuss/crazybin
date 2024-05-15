@@ -1,0 +1,66 @@
+name: Test python application
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  examples_custom_tile_object:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: ./.github/actions/setup_package
+    - name: Run custom_tile_object example
+      run: |
+        cd examples
+        python custom_tile_object.py
+  examples_frogs_gaussian:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: ./.github/actions/setup_package
+    - name: Run frogs_gaussian example
+      run: |
+        cd examples
+        python frogs_gaussian.py
+  examples_grande_jatte:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: ./.github/actions/setup_package
+    - name: Run grande_jatte example
+      run: |
+        cd examples
+        python grande_jatte.py
+  examples_great_wave:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: ./.github/actions/setup_package
+    - name: Run great_wave example
+      run: |
+        cd examples
+        python great_wave.py
+  examples_hex_rhomb:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: ./.github/actions/setup_package
+    - name: Run hex_rhomb example
+      run: |
+        cd examples
+        python hex_rhomb.py
+  examples_reptiles_sinewave:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: ./.github/actions/setup_package
+    - name: Run reptiles_sinewave example
+      run: |
+        cd examples
+        python reptiles_sinewave.py
