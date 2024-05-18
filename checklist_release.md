@@ -13,6 +13,9 @@ python3 -m unittest discover -s tests/integration
 - Update whats-new.md
 - Bump versions in `pyproject.toml` and `__init__.py`
 
+## Dependencies
+- update both `pyproject.toml` and `requirements.txt` (the latter is required by streamlit cloud)
+
 ## Release
 ```bash
 python3 -m build
