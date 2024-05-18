@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "crazybin"
 version = "1.0.0"
-description = "Much better than hexbins plots! Use any kind of tile to visualize data and pictures!"
+description = "Much better than hexbin plots! Use any kind of tile to visualize data and pictures!"
 readme = "README.md"
 authors = [{ name = "Paul Ockenfuß", email = "paul.ockenfuss@physik.uni-muenchen.de" }]
 license = { file = "LICENSE" }
@@ -26,7 +26,7 @@ dependencies = [
 requires-python = ">=3.9"
 
 [project.optional-dependencies]
-dev = ["check-manifest", "build", "twine"]
+dev = ["check-manifest", "build", "twine", "streamlit"]
 
 [project.urls]
 Homepage = "https://github.com/Ockenfuss/crazybin"
