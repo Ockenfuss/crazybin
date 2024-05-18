@@ -36,6 +36,8 @@ plt.show()
 
 ![](examples/images/grande_jatte_seurat.jpg)
 
+See [this interactive demo](https://tessellation.streamlit.app/) to create tessellations of your own images.
+
 ## Installation
 The package can be installed using `pip`:
 ```bash
